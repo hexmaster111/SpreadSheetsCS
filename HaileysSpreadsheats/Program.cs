@@ -6,15 +6,20 @@ bool run = true;
 DrawList dl = new();
 Dictionary<RowCol, Cell> cells = new();
 RowCol cursor = new();
+bool redraw = true;
 
 while (run)
 {
-    dl.ClearBackground();
-    DrawCellsBackground(10, 5);
-    DrawCellContent();
+    if (redraw)
+    {
+        dl.ClearBackground();
+        DrawCellsBackground(10, 5);
+        DrawCellContent();
+        redraw = false;
+    }
+
     dl.Move(0, 11);
     dl.Drawtext(cursor.ToString());
-
     if (cells.TryGetValue(cursor, out var currentSelectedCell))
     {
         dl.Move(0, 12);
@@ -55,6 +60,7 @@ while (run)
             {
                 cells[cursor] = userGivenCell;
                 RecomputeAllCells(cells);
+                redraw = true;
             }
 
             break;
@@ -65,6 +71,7 @@ while (run)
 
         case ConsoleKey.R:
             RecomputeAllCells(cells);
+            redraw = true;
             break;
     }
 }
