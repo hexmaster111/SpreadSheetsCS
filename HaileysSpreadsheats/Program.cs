@@ -1,15 +1,14 @@
 ﻿using HaileysSpreadsheats;
+using HaileysSpreadsheats.Expr;
 
-ExpressionCell.CompileExpression("51 + 11");
-ExpressionCell.CompileExpression("5 + 11 * 2");
-ExpressionCell.CompileExpression("(5 + 11) * 2");
-ExpressionCell.CompileExpression("5 + 11 / 2");
-ExpressionCell.CompileExpression("5 + 11 - 2");
+// CompExpr.FromString("5 + 11 * 2");
+// CompExpr.FromString("5 * 11 + 2");
+// CompExpr.FromString("51 + 11");
+// CompExpr.FromString("5 + 11 / 2");
+// CompExpr.FromString("5 + 11 - 2");
 
 bool run = true;
 DrawList dl = new();
-
-// List<Cell> cells = new();
 Dictionary<RowCol, Cell> cells = new();
 
 int currsorRow = 0, currsorCol = 0;
@@ -68,7 +67,7 @@ string CellName(int row, int col) => $"{(char)(col + 'A')}{row}";
 
 Cell? GetUserValueForCell(int row, int col)
 {
-    Console.SetCursorPosition(3, Console.BufferHeight);
+    Console.SetCursorPosition(3, Console.BufferHeight-1);
     Console.Write(CellName(row, col) + " = ");
     var l = Console.ReadLine();
     if (string.IsNullOrEmpty(l)) return null;
@@ -84,6 +83,7 @@ Cell? GetUserValueForCell(int row, int col)
     else if (l[0] == '=')
     {
         ret.Kind = Cell.CKind.Expr;
+        ret.Expr = CompExpr.FromString(l.Substring(1)); //Todo : Handle errors
     }
     else
     {
@@ -195,35 +195,37 @@ void SetCurrsorPos(int x, int y)
     dl.Move(x, y);
 }
 
-
-public struct Cell
+namespace HaileysSpreadsheats
 {
-    public enum CKind
+    public struct Cell
     {
-        Blank,
-        Expr,
-        Number,
-        String
+        public enum CKind
+        {
+            Blank,
+            Expr,
+            Number,
+            String
+        }
+
+        public CKind Kind;
+        public string Str;
+        public double Number;
+        public Expression Expr;
+
+        public string ContentString() => Kind switch
+        {
+            CKind.Blank => "",
+            CKind.Expr => Expr.Expr,
+            CKind.Number => Number.ToString("0.00"),
+            CKind.String => Str,
+            _ => "INVLD CELL"
+        };
     }
 
-    public CKind Kind;
-    public string Str;
-    public double Number;
-    public object Expr;
 
-    public string ContentString() => Kind switch
+    struct RowCol
     {
-        CKind.Blank => "",
-        CKind.Expr => "TODO",
-        CKind.Number => Number.ToString("0.00"),
-        CKind.String => Str,
-        _ => "INVLD CELL"
-    };
-}
-
-
-struct RowCol
-{
-    public int Row, Col;
-    public override int GetHashCode() => HashCode.Combine(Row.GetHashCode(), Col.GetHashCode());
+        public int Row, Col;
+        public override int GetHashCode() => HashCode.Combine(Row.GetHashCode(), Col.GetHashCode());
+    }
 }
