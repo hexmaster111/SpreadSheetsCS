@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Xml.Xsl;
 
 namespace HaileysSpreadsheats;
 
@@ -9,13 +10,15 @@ public struct CompiledExpression
 
 public enum TokenKind
 {
-    Number,
     Plus,
     Minus,
     Mul,
     Div,
     
-    SKIP //used by parts of lexer to communicate
+    Number,
+    BinExpr,
+    SKIP, //used by parts of lexer to communicate
+    
 }
 
 public struct Token
@@ -142,7 +145,7 @@ public class Lexer
     public Token Peek() => _tokens[Pos];
     public bool More() => _tokens.Count > Pos;
 
-    public Token Next()
+    public Token Consume()
     {
         var pk = Peek();
         Pos += 1;
@@ -150,17 +153,77 @@ public class Lexer
     }
 }
 
+public class Expr
+{
+    public TokenKind BindingOpp;
+    public Expr BinExpr;
+    public double Number;
+}
+
+
+public class Parcer
+{
+    public static Expr Parce( Parcer p, int limit)
+    {
+        var first = p._l.Consume();
+        var left = p.nud(first);
+        while (LeftBindingPower(p._l.Peek().Kind) > limit)
+        {
+            return p.led(left, p);
+        }
+        return left;
+    }
+
+    private Expr led(Expr left, Parcer p) => left.BindingOpp switch
+    {
+        TokenKind.Plus => new Expr(){BindingOpp = TokenKind.BinExpr, BinExpr = },
+        TokenKind.Minus => expr,
+        TokenKind.Mul => expr,
+        TokenKind.Div => expr,
+        _ => throw new ArgumentOutOfRangeException()
+    };
+
+    private Expr nud(Token first) => first.Kind switch
+    {
+        TokenKind.Number => new Expr(){BindingOpp = TokenKind.Number, Number = first.Value},
+        _ => throw new ArgumentOutOfRangeException()
+    };
+
+
+    private Lexer _l;
+
+    public static int LeftBindingPower(TokenKind tk) => tk switch
+    {
+        TokenKind.Number => 0,
+        TokenKind.Plus => 2,
+        TokenKind.Minus => 2,
+        TokenKind.Mul => 3,
+        TokenKind.Div => 3,
+        TokenKind.SKIP => -1,
+        _ => throw new ArgumentOutOfRangeException(nameof(tk), tk, null)
+    };
+
+
+    public readonly Expr Root;
+    
+    public Parcer(Lexer l)
+    {
+        _l = l;
+        Root = Parce(this, 0);
+    }
+
+  
+
+ 
+}
+
 public static class ExpressionCell
 {
     public static CompiledExpression CompileExpression(string expr)
     {
         Lexer l = new(expr);
-
-        while (l.More())
-        {
-            Console.WriteLine(l.Next().Kind);
-        }
-
+        Parcer p = new(l);
+        
 
         throw new NotImplementedException();
     }
