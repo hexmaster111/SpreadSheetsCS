@@ -8,6 +8,7 @@ public class Parser
     public static int LeftBindingPower(TokenKind tk) => tk switch
     {
         TokenKind.Number => 0,
+        TokenKind.Cell => 0,
         TokenKind.Plus => 2,
         TokenKind.Minus => 2,
         TokenKind.Mul => 3,
@@ -52,7 +53,8 @@ public class Parser
     {
         return tk.Kind switch
         {
-            TokenKind.Number => new AstNode() { Kind = TokenKind.Number, Value = tk.Value },
+            TokenKind.Number => new AstNode() { Kind = TokenKind.Number, Value = tk.NumberValue },
+            TokenKind.Cell => new AstNode() { Kind = TokenKind.Cell, CellPos = tk.CellPos },
             _ => throw new ArgumentOutOfRangeException()
         };
     }

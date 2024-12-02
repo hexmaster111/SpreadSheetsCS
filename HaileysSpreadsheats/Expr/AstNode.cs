@@ -6,6 +6,7 @@ public class AstNode
     public double Value;
     public AstNode Left;
     public AstNode Right;
+    public RowCol CellPos;
 
     public override string ToString()
     {
@@ -16,6 +17,7 @@ public class AstNode
             TokenKind.Minus => $"({Left} - {Right})",
             TokenKind.Mul => $"({Left} * {Right})",
             TokenKind.Div => $"({Left} / {Right})",
+            TokenKind.Cell => CellPos.ToString(),
             _ => throw new ArgumentOutOfRangeException()
         };
     }

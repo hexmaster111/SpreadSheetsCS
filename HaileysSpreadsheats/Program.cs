@@ -1,31 +1,35 @@
 ﻿using HaileysSpreadsheats;
 using HaileysSpreadsheats.Expr;
 
-// CompExpr.FromString("5 + 11 * 2");
-// CompExpr.FromString("5 * 11 + 2");
-// CompExpr.FromString("51 + 11");
-// CompExpr.FromString("5 + 11 / 2");
-// CompExpr.FromString("5 + 11 - 2");
 
 bool run = true;
 DrawList dl = new();
 Dictionary<RowCol, Cell> cells = new();
-
-int currsorRow = 0, currsorCol = 0;
+RowCol cursor = new();
 
 while (run)
 {
     dl.ClearBackground();
     DrawCellsBackground(10, 5);
     DrawCellContent();
-    dl.Move(0, 10);
-    dl.Drawtext(CellName(currsorRow, currsorCol));
+    dl.Move(0, 11);
+    dl.Drawtext(cursor.ToString());
+
+    if (cells.TryGetValue(cursor, out var currentSelectedCell))
+    {
+        dl.Move(0, 12);
+
+        if (currentSelectedCell.Kind == Cell.CKind.Expr)
+        {
+            dl.Drawtext(" = " + currentSelectedCell.Expr.Expr);
+        }
+    }
 
     Console.CursorVisible = false;
     dl.WriteToConsole();
     Console.CursorVisible = true;
 
-    MoveCursorToGridPos_NOW(currsorRow, currsorCol);
+    MoveCursorToGridPos_NOW(cursor.Row, cursor.Col);
 
     var key = Console.ReadKey();
     if (key.Key == ConsoleKey.Escape) run = false;
@@ -33,47 +37,80 @@ while (run)
     switch (key.Key)
     {
         case ConsoleKey.UpArrow:
-            currsorRow -= 1;
+            cursor.Row -= 1;
             break;
         case ConsoleKey.DownArrow:
-            currsorRow += 1;
+            cursor.Row += 1;
             break;
         case ConsoleKey.LeftArrow:
-            currsorCol -= 1;
+            cursor.Col -= 1;
             break;
         case ConsoleKey.RightArrow:
-            currsorCol += 1;
+            cursor.Col += 1;
             break;
+
         case ConsoleKey.Enter:
-            var userGivenCell = GetUserValueForCell(currsorRow, currsorCol);
+            var userGivenCell = GetUserValueForCell(cursor);
             if (userGivenCell != null)
-                cells[new RowCol() { Col = currsorCol, Row = currsorRow }] = userGivenCell.Value;
-            else cells[new RowCol() { Col = currsorCol, Row = currsorRow }] = default;
+            {
+                cells[cursor] = userGivenCell;
+                RecomputeAllCells(cells);
+            }
 
+            break;
 
+        case ConsoleKey.Delete:
+            cells.Remove(cursor);
+            break;
+
+        case ConsoleKey.R:
+            RecomputeAllCells(cells);
             break;
     }
 }
 
 return;
 
-Cell GetCell(int row, int col)
+Cell? GetCellAt(RowCol pos) => cells.GetValueOrDefault(pos);
+
+double GetCellValue(RowCol pos)
 {
-    var place = new RowCol() { Row = row, Col = col };
+    var c = GetCellAt(pos);
+    if (c == null) throw new Exception($"invalid cell pos {pos}");
+    if (c.Kind != Cell.CKind.Number && c.Kind != Cell.CKind.Expr) throw new Exception($"invalid cell kind {c.Kind}");
+    return c.Number;
+}
+
+void RecomputeAllCells(Dictionary<RowCol, Cell> allCellsOnSheet)
+{
+    foreach (var (_, value) in allCellsOnSheet)
+    {
+        value.ComputedValue = null;
+    }
+
+    foreach (var (key, value) in allCellsOnSheet)
+    {
+        if (value.Kind == Cell.CKind.Expr)
+        {
+            value.ComputedValue = CompExpr.Evaluate(value.Expr, GetCellValue);
+        }
+    }
+}
+
+Cell GetCell(RowCol place)
+{
     return cells.TryGetValue(place, out var cell) ? cell : new Cell();
 }
 
-string CellName(int row, int col) => $"{(char)(col + 'A')}{row}";
-
-Cell? GetUserValueForCell(int row, int col)
+Cell? GetUserValueForCell(RowCol pos)
 {
-    Console.SetCursorPosition(3, Console.BufferHeight-1);
-    Console.Write(CellName(row, col) + " = ");
+    Console.SetCursorPosition(3, Console.BufferHeight - 1);
+    Console.Write(pos.ToString() + " : ");
     var l = Console.ReadLine();
     if (string.IsNullOrEmpty(l)) return null;
 
 
-    var ret = GetCell(row, col);
+    var ret = GetCell(pos);
 
     if (double.TryParse(l, out var num))
     {
@@ -136,7 +173,7 @@ void DrawCellsBackground(int cols, int rows)
      *    └──────────┴──────────┴──────────┘
      */
 
-    SetCurrsorPos(0, 0);
+    SetCursorPos(0, 0);
 
     DrawText("┌");
     for (int i = 0; i < cols; i++)
@@ -190,14 +227,14 @@ void DrawText(string text)
     dl.Drawtext(text);
 }
 
-void SetCurrsorPos(int x, int y)
+void SetCursorPos(int x, int y)
 {
     dl.Move(x, y);
 }
 
 namespace HaileysSpreadsheats
 {
-    public struct Cell
+    public class Cell
     {
         public enum CKind
         {
@@ -210,22 +247,17 @@ namespace HaileysSpreadsheats
         public CKind Kind;
         public string Str;
         public double Number;
-        public Expression Expr;
+        public CompiledExpression Expr;
+
+        public double? ComputedValue;
 
         public string ContentString() => Kind switch
         {
             CKind.Blank => "",
-            CKind.Expr => Expr.Expr,
+            CKind.Expr => ComputedValue?.ToString("0.00") ?? "!ERROR!",
             CKind.Number => Number.ToString("0.00"),
             CKind.String => Str,
             _ => "INVLD CELL"
         };
-    }
-
-
-    struct RowCol
-    {
-        public int Row, Col;
-        public override int GetHashCode() => HashCode.Combine(Row.GetHashCode(), Col.GetHashCode());
     }
 }

@@ -17,12 +17,31 @@ public class Lexer
     private readonly List<TokenHandler> _tokenHandlers =
     [
         new() { Handler = HandleNumber, Regex = new Regex("[0-9]+(\\.[0-9]+)?") },
+        // new() { Handler = HandleCellRange, Regex = new Regex("[A-Z]+[0-9]+:[A-Z]+[0-9]+") }, // A1:B2
+        new() { Handler = HandleCell, Regex = new Regex("[A-Z]+[0-9]+") }, // A1
         new() { Handler = SkipWhiteSpace, Regex = new Regex("\\s+") },
         new() { Handler = HandleSymbP, Regex = new Regex("\\+") },
         new() { Handler = HandleSymbM, Regex = new Regex("-") },
         new() { Handler = HandleSymbD, Regex = new Regex("/") },
         new() { Handler = HandleSymbMu, Regex = new Regex("\\*") },
     ];
+
+    private static Token HandleCell(Lexer l, Match m)
+    {
+        string mv = m.Groups[0].Captures[0].Value;
+        string s = l.vss.Read(mv.Length);
+        
+        return new Token
+        {
+            Kind = TokenKind.Cell,
+            CellPos = RowCol.FromCellNotation(s)
+        };
+    }
+
+    // private static Token HandleCellRange(Lexer l, Match m)
+    // {
+    //     throw new NotImplementedException();
+    // }
 
     private static Token SkipWhiteSpace(Lexer l, Match m)
     {
@@ -42,7 +61,7 @@ public class Lexer
         return new Token()
         {
             Kind = TokenKind.Number,
-            Value = Double.Parse(s)
+            NumberValue = Double.Parse(s)
         };
     }
 
@@ -63,6 +82,7 @@ public class Lexer
     {
         RESET:
         Token ret = new();
+        bool found = false;
         foreach (var handler in _tokenHandlers)
         {
             var match = handler.Regex.Match(vss.Current);
@@ -70,7 +90,7 @@ public class Lexer
             {
                 // var caller = handler.Handler.GetMethodInfo().Name;
                 ret = handler.Handler(this, match);
-
+                found = true;
                 if (ret.Kind == TokenKind.SKIP)
                     goto RESET;
 
@@ -78,7 +98,8 @@ public class Lexer
             }
         }
 
-        return ret;
+        if (found) return ret;
+        throw new Exception("Invalid token");
     }
 
     public Lexer(string expr)
