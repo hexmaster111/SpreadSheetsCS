@@ -1,4 +1,5 @@
-﻿using HaileysSpreadsheats;
+﻿using System.Xml;
+using HaileysSpreadsheats;
 using HaileysSpreadsheats.Expr;
 
 
@@ -7,13 +8,13 @@ DrawList dl = new();
 Dictionary<RowCol, Cell> cells = new();
 RowCol cursor = new();
 bool redraw = true;
-
+ConsoleKeyInfo last = default;
 while (run)
 {
     if (redraw)
     {
         dl.ClearBackground();
-        DrawCellsBackground(10, 5);
+        DrawCellsBackground(5, 5);
         DrawCellContent();
         redraw = false;
     }
@@ -32,12 +33,29 @@ while (run)
 
     Console.CursorVisible = false;
     dl.WriteToConsole();
+    // Console.SetCursorPosition(5, 11);
+    // Console.Write($"{last.KeyChar}");
+    MoveCursorToGridPos_NOW(cursor.Row, cursor.Col);
     Console.CursorVisible = true;
 
-    MoveCursorToGridPos_NOW(cursor.Row, cursor.Col);
-
     var key = Console.ReadKey();
+    last = key;
     if (key.Key == ConsoleKey.Escape) run = false;
+
+    switch (key.KeyChar)
+    {
+        case '=':
+            {
+                var userGivenCell = GetUserValueForCell(cursor, '=');
+                if (userGivenCell != null)
+                {
+                    cells[cursor] = userGivenCell;
+                    RecomputeAllCells(cells);
+                    redraw = true;
+                }
+            }
+            break;
+    }
 
     switch (key.Key)
     {
@@ -55,23 +73,30 @@ while (run)
             break;
 
         case ConsoleKey.Enter:
-            var userGivenCell = GetUserValueForCell(cursor);
-            if (userGivenCell != null)
             {
-                cells[cursor] = userGivenCell;
-                RecomputeAllCells(cells);
-                redraw = true;
-            }
 
-            break;
+                var userGivenCell = GetUserValueForCell(cursor);
+                if (userGivenCell != null)
+                {
+                    cells[cursor] = userGivenCell;
+                    RecomputeAllCells(cells);
+                    redraw = true;
+                }
+                break;
+            }
 
         case ConsoleKey.Delete:
             cells.Remove(cursor);
+            redraw = true;
             break;
 
         case ConsoleKey.R:
             RecomputeAllCells(cells);
             redraw = true;
+            break;
+
+        default:
+
             break;
     }
 }
@@ -109,11 +134,36 @@ Cell GetCell(RowCol place)
     return cells.TryGetValue(place, out var cell) ? cell : new Cell();
 }
 
-Cell? GetUserValueForCell(RowCol pos)
+Cell? GetUserValueForCell(RowCol pos, char v = (char)0)
 {
     Console.SetCursorPosition(3, Console.BufferHeight - 1);
     Console.Write(pos.ToString() + " : ");
-    var l = Console.ReadLine();
+    // var l = Console.ReadLine(); //todo rplce me with better excape support
+
+    var l = "";
+
+    if (v != 0)
+    {
+        l += v;
+        Console.Write(v);
+    }
+
+    while (true)
+    {
+        var k = Console.ReadKey();
+        if (k.Key == ConsoleKey.Escape) return null;
+        else if (k.Key == ConsoleKey.Backspace && l!="")
+        {
+            l = l[..^1];
+            Console.Write('\b');
+            Console.Write(' ');
+            Console.Write('\b');
+            Console.WriteLine(l);
+        }
+        else if (k.Key == ConsoleKey.Enter) break;
+        else if (char.IsAscii(k.KeyChar)) l += k.KeyChar;
+    }
+
     if (string.IsNullOrEmpty(l)) return null;
 
 
@@ -170,7 +220,7 @@ void DrawCellContent()
 
 void DrawCellsBackground(int cols, int rows)
 {
-    /*    ┼ ┴ ┬ ┤ ├ ┘ └ ┐ ┌ │ ─
+    /*    
      *    ┌──────────┬──────────┬──────────┐
      *    │          │          │          │
      *    ├──────────┼──────────┼──────────┤
