@@ -3,7 +3,7 @@ namespace HaileysSpreadsheats;
 public class DrawList()
 {
     private readonly List<Terminst> insts = new();
-    public void Drawtext(string s) => insts.Add(new Terminst { str = s, kind = Terminst.Tkind.drawtext });
+    public void DrawText(string s) => insts.Add(new Terminst { str = s, kind = Terminst.Tkind.drawtext });
     public void SetForgound(ConsoleColor c) => insts.Add(new Terminst { kind = Terminst.Tkind.change_color_fg, col = c });
 
     public void SetBackground(ConsoleColor c) => insts.Add(new Terminst { kind = Terminst.Tkind.change_color_bg, col = c });

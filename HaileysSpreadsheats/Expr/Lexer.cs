@@ -16,32 +16,43 @@ public class Lexer
 
     private readonly List<TokenHandler> _tokenHandlers =
     [
-        new() { Handler = HandleNumber, Regex = new Regex("[0-9]+(\\.[0-9]+)?") },
-        // new() { Handler = HandleCellRange, Regex = new Regex("[A-Z]+[0-9]+:[A-Z]+[0-9]+") }, // A1:B2
-        new() { Handler = HandleCell, Regex = new Regex("[A-Z]+[0-9]+") }, // A1
-        new() { Handler = SkipWhiteSpace, Regex = new Regex("\\s+") },
-        new() { Handler = HandleSymbP, Regex = new Regex("\\+") },
-        new() { Handler = HandleSymbM, Regex = new Regex("-") },
-        new() { Handler = HandleSymbD, Regex = new Regex("/") },
-        new() { Handler = HandleSymbMu, Regex = new Regex("\\*") },
+        new()
+        {
+            Handler = HandleRandomCellValue,
+            Regex = new Regex(@"(?<num>[0-9]+)d(?<sides>[0-9]+)", RegexOptions.IgnoreCase)
+        },
+        new() { Handler = HandleNumber, Regex = new Regex("[0-9]+(\\.[0-9]+)?", RegexOptions.IgnoreCase) },
+        // new() { Handler = HandleCellRange, Regex = new Regex("[A-Z]+[0-9]+:[A-Z]+[0-9]+", RegexOptions.IgnoreCase) }, // A1:B2
+        new() { Handler = HandleCell, Regex = new Regex("[A-Z]+[0-9]+", RegexOptions.IgnoreCase) }, // A1
+        new() { Handler = SkipWhiteSpace, Regex = new Regex("\\s+", RegexOptions.IgnoreCase) },
+        new() { Handler = HandleSymbP, Regex = new Regex("\\+", RegexOptions.IgnoreCase) },
+        new() { Handler = HandleSymbM, Regex = new Regex("-", RegexOptions.IgnoreCase) },
+        new() { Handler = HandleSymbD, Regex = new Regex("/", RegexOptions.IgnoreCase) },
+        new() { Handler = HandleSymbMu, Regex = new Regex("\\*", RegexOptions.IgnoreCase) },
     ];
+
+    private static Token HandleRandomCellValue(Lexer l, Match m)
+    {
+        string mv = m.Groups[0].Captures[0].Value;
+        string s = l.vss.Read(mv.Length);
+        return new Token
+        {
+            Kind = TokenKind.DiceRoll,
+            DiceRoll = new Roll(s)
+        };
+    }
 
     private static Token HandleCell(Lexer l, Match m)
     {
         string mv = m.Groups[0].Captures[0].Value;
         string s = l.vss.Read(mv.Length);
-        
+
         return new Token
         {
             Kind = TokenKind.Cell,
             CellPos = RowCol.FromCellNotation(s)
         };
     }
-
-    // private static Token HandleCellRange(Lexer l, Match m)
-    // {
-    //     throw new NotImplementedException();
-    // }
 
     private static Token SkipWhiteSpace(Lexer l, Match m)
     {
@@ -125,5 +136,20 @@ public class Lexer
         var pk = Peek();
         Pos += 1;
         return pk;
+    }
+}
+
+public struct Roll
+{
+    public int Sides;
+    public int Rolls;
+
+    public override string ToString() => $"{Rolls}d{Sides}";
+
+    public Roll(string s)
+    {
+        var parts = s.Split('d');
+        Rolls = int.Parse(parts[0]);
+        Sides = int.Parse(parts[1]);
     }
 }

@@ -21,22 +21,25 @@ public class Compiler(AstNode root)
             switch (n.Kind)
             {
                 case TokenKind.Number:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.PushNumber, Number = n.Value });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.PushNumber, Number = n.Value });
                     break;
                 case TokenKind.Cell:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.PushCell, Cell = n.CellPos });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.PushCell, Cell = n.CellPos });
+                    break;
+                case TokenKind.DiceRoll:
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.PushDiceRoll, Roll = n.Roll });
                     break;
                 case TokenKind.Plus:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.Plus });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.Plus });
                     break;
                 case TokenKind.Minus:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.Minus });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.Minus });
                     break;
                 case TokenKind.Mul:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.Mul });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.Mul });
                     break;
                 case TokenKind.Div:
-                    ret.Add(new CompExprOp() { Kind = CompExprOp.Op.Div });
+                    ret.Add(new CompExprOp { Kind = CompExprOp.Op.Div });
                     break;
                 default:
                     return (null, "Unknown token kind");

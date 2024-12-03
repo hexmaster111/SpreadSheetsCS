@@ -17,18 +17,22 @@ public struct CompExprOp
 
         PushNumber,
         PushCell,
+        PushDiceRoll
     }
 
     public Op Kind;
     public double Number;
     public RowCol Cell;
+    public Roll Roll;
 }
 
 public static class CompExpr
 {
     public delegate double CellLookup(RowCol cell);
 
-    public static double Evaluate(CompiledExpression expr, CellLookup cellLookup)
+    public delegate double RollDelegate(Roll spec, RowCol where);
+
+    public static double Evaluate(CompiledExpression expr, CellLookup cellLookup, RollDelegate roll, RowCol where)
     {
         Stack<double> stack = new();
         foreach (var op in expr.Ops)
@@ -68,6 +72,9 @@ public static class CompExpr
                     break;
                 case CompExprOp.Op.PushCell:
                     stack.Push(cellLookup(op.Cell));
+                    break;
+                case CompExprOp.Op.PushDiceRoll:
+                    stack.Push(roll(op.Roll, where));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

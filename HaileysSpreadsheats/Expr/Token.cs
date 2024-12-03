@@ -6,6 +6,7 @@ public struct Token
     public RowCol CellPos;
 
     public TokenKind Kind;
+    public Roll DiceRoll;
 }
 
 
@@ -19,6 +20,7 @@ public enum TokenKind
     Number, // 123
     Cell, // A1
     CellRange, // A1:B2
+    DiceRoll, // 1d20
 
     SKIP, //used by parts of lexer to communicate
     EOF,

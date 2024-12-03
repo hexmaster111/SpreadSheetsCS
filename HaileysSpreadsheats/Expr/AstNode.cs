@@ -7,6 +7,7 @@ public class AstNode
     public AstNode Left;
     public AstNode Right;
     public RowCol CellPos;
+    public Roll Roll;
 
     public override string ToString()
     {

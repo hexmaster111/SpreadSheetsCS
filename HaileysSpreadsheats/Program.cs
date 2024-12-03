@@ -3,31 +3,40 @@ using HaileysSpreadsheats;
 using HaileysSpreadsheats.Expr;
 
 
-bool run = true;
 DrawList dl = new();
 Dictionary<RowCol, Cell> cells = new();
 RowCol cursor = new();
-bool redraw = true;
 ConsoleKeyInfo last = default;
+List<RollLogEntry> rollLog = new();
+
+var run = true;
+var redraw = true;
+var needRedrawAfterMove = true;
+
 while (run)
 {
     if (redraw)
     {
         dl.ClearBackground();
-        DrawCellsBackground(5, 5);
+        DrawCellsBackground();
+        DrawRollLog();
+        DrawCellsLabels();
         DrawCellContent();
         redraw = false;
+        needRedrawAfterMove = false;
     }
 
-    dl.Move(0, 11);
-    dl.Drawtext(cursor.ToString());
+
+    dl.Move(1, 12);
+    dl.DrawText(cursor.ToString());
     if (cells.TryGetValue(cursor, out var currentSelectedCell))
     {
-        dl.Move(0, 12);
+        dl.Move(0, 13);
 
         if (currentSelectedCell.Kind == Cell.CKind.Expr)
         {
-            dl.Drawtext(" = " + currentSelectedCell.Expr.Expr);
+            dl.DrawText(" = " + currentSelectedCell.Expr.Expr);
+            needRedrawAfterMove = true;
         }
     }
 
@@ -38,52 +47,41 @@ while (run)
     MoveCursorToGridPos_NOW(cursor.Row, cursor.Col);
     Console.CursorVisible = true;
 
-    var key = Console.ReadKey();
-    last = key;
+    var key = last = Console.ReadKey();
+
     if (key.Key == ConsoleKey.Escape) run = false;
 
     switch (key.KeyChar)
     {
         case '=':
-            {
-                var userGivenCell = GetUserValueForCell(cursor, '=');
-                if (userGivenCell != null)
-                {
-                    cells[cursor] = userGivenCell;
-                    RecomputeAllCells(cells);
-                    redraw = true;
-                }
-            }
+        {
+            GetUserValueWithErrorReportingLoop('=');
             break;
+        }
     }
 
     switch (key.Key)
     {
         case ConsoleKey.UpArrow:
             cursor.Row -= 1;
+            if (needRedrawAfterMove) redraw = true;
             break;
         case ConsoleKey.DownArrow:
             cursor.Row += 1;
+            if (needRedrawAfterMove) redraw = true;
             break;
         case ConsoleKey.LeftArrow:
             cursor.Col -= 1;
+            if (needRedrawAfterMove) redraw = true;
             break;
         case ConsoleKey.RightArrow:
             cursor.Col += 1;
+            if (needRedrawAfterMove) redraw = true;
             break;
 
         case ConsoleKey.Enter:
-            {
-
-                var userGivenCell = GetUserValueForCell(cursor);
-                if (userGivenCell != null)
-                {
-                    cells[cursor] = userGivenCell;
-                    RecomputeAllCells(cells);
-                    redraw = true;
-                }
-                break;
-            }
+            GetUserValueWithErrorReportingLoop();
+            break;
 
         case ConsoleKey.Delete:
             cells.Remove(cursor);
@@ -91,54 +89,120 @@ while (run)
             break;
 
         case ConsoleKey.R:
-            RecomputeAllCells(cells);
+            RecomputeAllCells();
             redraw = true;
-            break;
-
-        default:
-
             break;
     }
 }
 
 return;
 
+void DrawRollLog()
+{
+    int lz = 5 * 12;
+    int offset = 0;
+    dl.Move(lz, offset++);
+    dl.DrawText("Dice Roll Log");
+    dl.Move(lz, offset++);
+
+    foreach (var entry in rollLog)
+    {
+        dl.Move(lz, offset++);
+        dl.DrawText($"{entry.When:HH:mm:ss} {entry.Where} {entry.Roll} = {entry.Result}");
+    }
+}
+
+void GetUserValueWithErrorReportingLoop(char pretype = (char)0)
+{
+    retry:
+    try
+    {
+        var userGivenCell = GetUserValueForCell(cursor, pretype);
+        if (userGivenCell != null)
+        {
+            cells[cursor] = userGivenCell;
+            RecomputeAllCells();
+        }
+    }
+    catch (Exception e)
+    {
+        Console.SetCursorPosition(3, Console.BufferHeight - 2);
+        Console.Write("Invalid Value for cell");
+        goto retry;
+    }
+
+    redraw = true;
+}
+
 Cell? GetCellAt(RowCol pos) => cells.GetValueOrDefault(pos);
 
 double GetCellValue(RowCol pos)
 {
     var c = GetCellAt(pos);
-    if (c == null) throw new Exception($"invalid cell pos {pos}");
+    if (c == null) return 0; // Blank cells are 0
     if (c.Kind != Cell.CKind.Number && c.Kind != Cell.CKind.Expr) throw new Exception($"invalid cell kind {c.Kind}");
+    if (c.ComputedValue != null) return c.ComputedValue.Value; // computed value is cached
     return c.Number;
 }
 
-void RecomputeAllCells(Dictionary<RowCol, Cell> allCellsOnSheet)
+void RecomputeAllCells()
 {
-    foreach (var (_, value) in allCellsOnSheet)
+    foreach (var (_, value) in cells)
     {
         value.ComputedValue = null;
     }
 
-    foreach (var (key, value) in allCellsOnSheet)
+    foreach (var (key, value) in cells)
     {
         if (value.Kind == Cell.CKind.Expr)
         {
-            value.ComputedValue = CompExpr.Evaluate(value.Expr, GetCellValue);
+            value.ComputedValue = CompExpr.Evaluate(value.Expr, GetCellValue, RollTheDice, key);
         }
     }
 }
 
-Cell GetCell(RowCol place)
+double RollTheDice(Roll spec, RowCol where)
 {
-    return cells.TryGetValue(place, out var cell) ? cell : new Cell();
+    var r = new Random();
+    var sum = 0;
+
+    for (int i = 0; i < spec.Rolls; i++)
+    {
+        int ro = r.Next(1, spec.Sides + 1);
+        sum += ro;
+    }
+
+    LogRollResults(where, sum, spec);
+    return sum;
 }
+
+void LogRollResults(RowCol inCell, int resault, Roll roll)
+{
+    rollLog.Add(new RollLogEntry
+    {
+        When = DateTime.Now,
+        Where = inCell,
+        Roll = roll,
+        Result = resault
+    });
+
+    if (rollLog.Count > 10) rollLog.RemoveAt(0);
+
+    redraw = true;
+}
+
+Cell GetCellOrNew(RowCol place) => cells.TryGetValue(place, out var cell) ? cell : new Cell();
 
 Cell? GetUserValueForCell(RowCol pos, char v = (char)0)
 {
     Console.SetCursorPosition(3, Console.BufferHeight - 1);
-    Console.Write(pos.ToString() + " : ");
-    // var l = Console.ReadLine(); //todo rplce me with better excape support
+    for (int i = 3; i < Console.BufferWidth; i++)
+    {
+        Console.Write(' ');
+    }
+
+    Console.SetCursorPosition(3, Console.BufferHeight - 1);
+    Console.Write(pos + " : ");
 
     var l = "";
 
@@ -152,22 +216,21 @@ Cell? GetUserValueForCell(RowCol pos, char v = (char)0)
     {
         var k = Console.ReadKey();
         if (k.Key == ConsoleKey.Escape) return null;
-        else if (k.Key == ConsoleKey.Backspace && l!="")
+        if (k.Key == ConsoleKey.Backspace && l != "")
         {
             l = l[..^1];
-            Console.Write('\b');
             Console.Write(' ');
             Console.Write('\b');
-            Console.WriteLine(l);
         }
+        else if (k.Key == ConsoleKey.Backspace) Console.Write(' ');
         else if (k.Key == ConsoleKey.Enter) break;
-        else if (char.IsAscii(k.KeyChar)) l += k.KeyChar;
+        else if (char.IsBetween(k.KeyChar, (char)32, (char)128)) l += k.KeyChar;
     }
 
     if (string.IsNullOrEmpty(l)) return null;
 
 
-    var ret = GetCell(pos);
+    var ret = GetCellOrNew(pos);
 
     if (double.TryParse(l, out var num))
     {
@@ -177,7 +240,7 @@ Cell? GetUserValueForCell(RowCol pos, char v = (char)0)
     else if (l[0] == '=')
     {
         ret.Kind = Cell.CKind.Expr;
-        ret.Expr = CompExpr.FromString(l.Substring(1)); //Todo : Handle errors
+        ret.Expr = CompExpr.FromString(l.Substring(1));
     }
     else
     {
@@ -204,8 +267,8 @@ void CursorToGridPos(int row, int col)
 {
     row *= 2;
     col *= 11;
-    row += 1;
-    col += 1;
+    row += 2;
+    col += 3;
     return (col, row);
 }
 
@@ -214,79 +277,81 @@ void DrawCellContent()
     foreach (var cell in cells)
     {
         CursorToGridPos(cell.Key.Row, cell.Key.Col);
-        DrawText(cell.Value.ContentString());
+        dl.DrawText(cell.Value.ContentString());
     }
 }
 
-void DrawCellsBackground(int cols, int rows)
+void DrawCellsLabels()
 {
-    /*    
-     *    ┌──────────┬──────────┬──────────┐
-     *    │          │          │          │
-     *    ├──────────┼──────────┼──────────┤
-     *    │          │          │          │
-     *    ├──────────┼──────────┼──────────┤
-     *    │          │          │          │
-     *    └──────────┴──────────┴──────────┘
-     */
-
-    SetCursorPos(0, 0);
-
-    DrawText("┌");
-    for (int i = 0; i < cols; i++)
+    for (int i = 1; i < 6; i++)
     {
-        DrawText("──────────");
-
-        if (i != cols - 1)
-            DrawText("┬");
+        dl.Move((i * 11) - 4, 0);
+        dl.DrawText(((char)('A' + i - 1)).ToString());
     }
 
-    DrawText("┐\r\n");
+    for (int i = 1; i < 6; i++)
+    {
+        dl.Move(0, i * 2);
+        dl.DrawText(i.ToString("00"));
+    }
+}
+
+void DrawCellsBackground(int cols = 5, int rows = 5)
+{
+    dl.Move(2, 1);
+    dl.DrawText("┌");
+    for (int i = 0; i < cols; i++)
+    {
+        dl.DrawText("──────────");
+
+        if (i != cols - 1)
+            dl.DrawText("┬");
+    }
+
+    dl.DrawText("┐\r\n  ");
+
 
     do
     {
         for (int i = 0; i < cols; i++)
         {
-            DrawText("│          ");
+            dl.DrawText("│          ");
         }
 
-        DrawText("│\r\n");
+        dl.DrawText("│\r\n  ");
 
         if (rows - 1 != 0)
         {
-            DrawText("├");
+            dl.DrawText("├");
             for (int i = 0; i < cols; i++)
             {
-                DrawText("──────────");
+                dl.DrawText("──────────");
 
                 if (i != cols - 1)
-                    DrawText("┼");
+                    dl.DrawText("┼");
             }
 
-            DrawText("┤\r\n");
+            dl.DrawText("┤\r\n  ");
         }
     } while ((rows -= 1) != 0);
 
-    DrawText("└");
+    dl.DrawText("└");
     for (int i = 0; i < cols; i++)
     {
-        DrawText("──────────");
+        dl.DrawText("──────────");
         if (i != cols - 1)
-            DrawText("┴");
+            dl.DrawText("┴");
     }
 
-    DrawText("┘\r\n");
+    dl.DrawText("┘\r\n");
 }
 
-
-void DrawText(string text)
+public struct RollLogEntry
 {
-    dl.Drawtext(text);
-}
-
-void SetCursorPos(int x, int y)
-{
-    dl.Move(x, y);
+    public DateTime When;
+    public RowCol Where;
+    public Roll Roll;
+    public int Result;
 }
 
 namespace HaileysSpreadsheats

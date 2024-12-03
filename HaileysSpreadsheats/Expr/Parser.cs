@@ -9,6 +9,7 @@ public class Parser
     {
         TokenKind.Number => 0,
         TokenKind.Cell => 0,
+        TokenKind.DiceRoll => 0,
         TokenKind.Plus => 2,
         TokenKind.Minus => 2,
         TokenKind.Mul => 3,
@@ -55,6 +56,7 @@ public class Parser
         {
             TokenKind.Number => new AstNode() { Kind = TokenKind.Number, Value = tk.NumberValue },
             TokenKind.Cell => new AstNode() { Kind = TokenKind.Cell, CellPos = tk.CellPos },
+            TokenKind.DiceRoll => new AstNode() { Kind = TokenKind.DiceRoll, Roll = tk.DiceRoll },
             _ => throw new ArgumentOutOfRangeException()
         };
     }
